@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سعر البيتكوين - Bitcoin Price</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(45deg, #1a1a2e, #16213e, #0f3460);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .bitcoin-icon {
+            font-size: 50px;
+            margin-bottom: 20px;
+            color: #f7931a;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        .price {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #00ff88;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .change {
+            font-size: 18px;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .positive { background: rgba(0, 255, 0, 0.2); color: #00ff00; }
+        .negative { background: rgba(255, 0, 0, 0.2); color: #ff4444; }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #ccc;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .update-time {
+            font-size: 12px;
+            color: #ccc;
+            margin: 15px 0;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+
+        .refresh-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .loading {
+            display: none;
+            color: #ccc;
+            margin: 10px 0;
+        }
+
+        .error {
+            display: none;
+            color: #ff4444;
+            background: rgba(255, 68, 68, 0.1);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        @media (max-width: 480px) {
+            .container { padding: 20px; }
+            .price { font-size: 28px; }
+            .stats { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="bitcoin-icon">₿</div>
+        <h1>سعر البيتكوين</h1>
+        
+        <div class="price" id="price">$0.00</div>
+        <div class="change" id="change">0.00%</div>
+        
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">أعلى (24س)</div>
+                <div class="stat-value" id="high">$0.00</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">أقل (24س)</div>
+                <div class="stat-value" id="low">$0.00</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">الحجم (24س)</div>
+                <div class="stat-value" id="volume">$0.00</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">القيمة السوقية</div>
+                <div class="stat-value" id="marketCap">$0.00</div>
+            </div>
+        </div>
+        
+        <div class="update-time" id="updateTime">آخر تحديث: --</div>
+        
+        <div class="loading" id="loading">جاري التحميل...</div>
+        <div class="error" id="error">حدث خطأ في التحميل</div>
+        
+        <button class="refresh-btn" onclick="getBitcoinPrice()">تحديث</button>
+    </div>
+
+    <script>
+        let lastPrice = 0;
+        let updateInterval;
+
+        function formatNumber(num) {
+            if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+            return num.toFixed(2);
+        }
+
+        function updateUI(data) {
+            const price = data.market_data.current_price.usd;
+            const change = data.market_data.price_change_percentage_24h;
+            
+            // تحديث السعر
+            document.getElementById('price').textContent = `$${formatNumber(price)}`;
+            
+            // تأثير النبض عند تغير السعر
+            if (lastPrice !== 0 && price !== lastPrice) {
+                document.getElementById('price').style.animation = 'pulse 1s';
+                setTimeout(() => {
+                    document.getElementById('price').style.animation = '';
+                }, 1000);
+            }
+            lastPrice = price;
+            
+            // تحديث التغير
+            const changeElement = document.getElementById('change');
+            changeElement.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+            changeElement.className = `change ${change >= 0 ? 'positive' : 'negative'}`;
+            
+            // تحديث الإحصائيات
+            document.getElementById('high').textContent = `$${formatNumber(data.market_data.high_24h.usd)}`;
+            document.getElementById('low').textContent = `$${formatNumber(data.market_data.low_24h.usd)}`;
+            document.getElementById('volume').textContent = `$${formatNumber(data.market_data.total_volume.usd)}`;
+            document.getElementById('marketCap').textContent = `$${formatNumber(data.market_data.market_cap.usd)}`;
+            
+            // تحديث الوقت
+            document.getElementById('updateTime').textContent = 
+                `آخر تحديث: ${new Date().toLocaleTimeString('ar-SA')}`;
+        }
+
+        async function getBitcoinPrice() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('error').style.display = 'none';
+                
+                const response = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false');
+                
+                if (!response.ok) throw new Error('فشل في جلب البيانات');
+                
+                const data = await response.json();
+                updateUI(data);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'حدث خطأ في تحميل البيانات';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function startAutoUpdate() {
+            updateInterval = setInterval(getBitcoinPrice, 30000); // كل 30 ثانية
+        }
+
+        function stopAutoUpdate() {
+            if (updateInterval) clearInterval(updateInterval);
+        }
+
+        // تحسين الأداء
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) stopAutoUpdate();
+            else startAutoUpdate();
+        });
+
+        // تحميل البيانات عند بدء التطبيق
+        document.addEventListener('DOMContentLoaded', () => {
+            getBitcoinPrice();
+            startAutoUpdate();
+        });
+
+        // إضافة تأثير النبض
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.1); }
+                100% { transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html> 
